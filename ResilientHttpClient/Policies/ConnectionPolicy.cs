@@ -40,7 +40,7 @@ namespace ResilientHttp.Policies
     public bool LogFaults { get; set; } = true;
 
     /// <summary>How long to wait until considering the entire operation is considered timed out (not an individual retry).</summary>
-    public TimeSpan GlobalTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    public TimeSpan GlobalTimeout { get; set; } = TimeSpan.FromMinutes(1);
 
     internal AsyncPolicy<HttpResponseMessage> ToPollyPolicy(ConnectionPolicyOverrides overrides)
     {
@@ -90,7 +90,8 @@ namespace ResilientHttp.Policies
       public BackOffPolicy BackOffPolicy { get; set; } = BackOffPolicies.ExponentialWithJitter(
         duration: TimeSpan.FromSeconds(1),
         baseDelay: TimeSpan.FromMilliseconds(500),
-        maxDelay: TimeSpan.FromSeconds(30)
+        maxDelay: TimeSpan.FromSeconds(30),
+        maxJitter: TimeSpan.FromSeconds(3)
       );
 
       /// <summary>The set of <see cref="HttpStatusCode"/>s on which to retry method invocations.</summary>
@@ -103,16 +104,20 @@ namespace ResilientHttp.Policies
         HttpStatusCode.GatewayTimeout
       });
 
+      /// <summary>A predicate that determines if a particular exception should be retried.</summary>
+      public ExceptionPolicy ExceptionsPolicy { get; set; } = ExceptionPolicies.All;
+
       public AsyncPolicy<HttpResponseMessage> ToPollyPolicy(RetryOptionsOverride overrides)
       {
-        var statusCodes   = overrides.StatusCodes.GetOrDefault(StatusCodes);
-        var maxRetries    = overrides.MaxRetries.GetOrDefault(MaxRetries);
-        var backOffPolicy = overrides.BackOffPolicy.GetOrDefault(BackOffPolicy);
-        var retryTimeout  = overrides.RetryTimeout.GetOrDefault(RetryTimeout);
+        var statusCodes       = overrides.StatusCodes.GetOrDefault(StatusCodes);
+        var maxRetries        = overrides.MaxRetries.GetOrDefault(MaxRetries);
+        var backOffPolicy     = overrides.BackOffPolicy.GetOrDefault(BackOffPolicy);
+        var retryTimeout      = overrides.RetryTimeout.GetOrDefault(RetryTimeout);
+        var exceptionsToRetry = overrides.ExceptionPolicy.GetOrDefault(ExceptionsPolicy);
 
         return Policy
           .HandleResult<HttpResponseMessage>(message => statusCodes.Contains(message.StatusCode))
-          .Or<Exception>()
+          .Or<Exception>(exception => exceptionsToRetry(exception))
           .WaitAndRetryAsync(maxRetries, attempt => backOffPolicy(attempt))
           .WrapAsync(Policy.TimeoutAsync<HttpResponseMessage>(retryTimeout));
       }
@@ -123,24 +128,24 @@ namespace ResilientHttp.Policies
       /// <summary>True if the circuit policy should be honored.</summary>
       public bool IsEnabled => Policy != null;
 
-      /// <summary>A repository to use for circuit breaker status checks</summary>
-      public CircuitBreakerPolicy Policy { get; set; }
+      /// <summary>A policy to use for circuit operation.</summary>
+      public CircuitPolicy Policy { get; set; }
 
       public AsyncPolicy<HttpResponseMessage> ToPollyPolicy(CircuitOptionsOverride overrides)
       {
         var policy = overrides.Policy.GetOrDefault(Policy);
 
-        return new AsyncCircuitBreakerPolicy(policy);
+        return new ExternalCircuitBreakerPolicy(policy);
       }
 
-      /// <summary>A custom  <see cref="AsyncPolicy{TResult}"/> that delegates circuit breaker state to some central <see cref="ICircuitBreakerRepository"/>.</summary>
-      private sealed class AsyncCircuitBreakerPolicy : AsyncPolicy<HttpResponseMessage>
+      /// <summary>A <see cref="AsyncPolicy"/> that implements a circuit breaker pattern by deferring to some external implementation.</summary>
+      private sealed class ExternalCircuitBreakerPolicy : AsyncPolicy<HttpResponseMessage>
       {
-        private readonly CircuitBreakerPolicy policy;
+        private readonly CircuitPolicy circuitPolicy;
 
-        public AsyncCircuitBreakerPolicy(CircuitBreakerPolicy policy)
+        public ExternalCircuitBreakerPolicy(CircuitPolicy circuitPolicy)
         {
-          this.policy = policy;
+          this.circuitPolicy = circuitPolicy;
         }
 
         protected override async Task<HttpResponseMessage> ImplementationAsync(
@@ -149,16 +154,9 @@ namespace ResilientHttp.Policies
           CancellationToken cancellationToken,
           bool continueOnCapturedContext)
         {
-          cancellationToken.ThrowIfCancellationRequested();
+          var response = await action(context, cancellationToken).ConfigureAwait(continueOnCapturedContext);
 
-          try
-          {
-            return await action(context, cancellationToken).ConfigureAwait(continueOnCapturedContext);
-          }
-          catch (Exception ex)
-          {
-            throw;
-          }
+          throw new NotImplementedException();
         }
       }
     }
@@ -183,7 +181,7 @@ namespace ResilientHttp.Policies
       });
 
       /// <summary>The default amount of time each cache entry persists for.</summary>
-      public TimeSpan TimeToLive { get; set; } = TimeSpan.FromSeconds(30);
+      public TimeSpan TimeToLive { get; set; } = TimeSpan.FromMinutes(5);
 
       /// <summary>True to enable a sliding expiration on the resultant cache entries.</summary>
       /// <remarks>If this is true, the <see cref="TimeToLive"/> will be renewed upon each successful cache hit.</remarks>
@@ -191,18 +189,20 @@ namespace ResilientHttp.Policies
 
       /// <summary>The <see cref="TimeToLivePolicy"/> to be used. By default HTTP response headers are honored.</summary>
       /// <remarks>N.B: The response must still pass the <see cref="StatusCodes"/> check in order for it to be cached.</remarks>
-      public TimeToLivePolicy TimeToLivePolicy { get; set; } = TimeToLivePolicies.ByCacheControlHeaders;
+      public TimeToLivePolicy TimeToLivePolicy { get; set; } = TimeToLivePolicies.Default;
 
       public AsyncPolicy<HttpResponseMessage> ToPollyPolicy(CachingOptionsOverride overrides)
       {
+        var cacheProvider     = overrides.CacheProvider.GetOrDefault(CacheProvider);
+        var cachePrefix       = overrides.CachePrefix.GetOrDefault(CachePrefix);
         var statusCodes       = overrides.StatusCodes.GetOrDefault(StatusCodes);
         var timeToLivePolicy  = overrides.TimeToLivePolicy.GetOrDefault(TimeToLivePolicy);
         var defaultTimeToLive = overrides.TimeToLive.GetOrDefault(TimeToLive);
         var slidingExpiration = overrides.SlidingExpiration.GetOrDefault(SlidingExpiration);
 
         return Policy.CacheAsync(
-          cacheProvider: overrides.CacheProvider.GetOrDefault(CacheProvider),
-          cacheKeyStrategy: context => $"{overrides.CachePrefix.GetOrDefault(CachePrefix) ?? string.Empty}{context.OperationKey}",
+          cacheProvider: cacheProvider,
+          cacheKeyStrategy: context => $"{cachePrefix ?? string.Empty}{context.OperationKey}",
           ttlStrategy: new ResultTtl<HttpResponseMessage>(response =>
           {
             if (statusCodes.Contains(response.StatusCode))
@@ -232,18 +232,18 @@ namespace ResilientHttp.Policies
 
     public sealed record RetryOptionsOverride
     {
-      public Optional<bool>                        IsEnabled            { get; set; }
-      public Optional<int>                         MaxRetries           { get; set; }
-      public Optional<TimeSpan>                    RetryTimeout         { get; set; }
-      public Optional<BackOffPolicy>               BackOffPolicy        { get; set; }
-      public Optional<CircuitBreakerPolicy>        CircuitBreakerPolicy { get; set; }
-      public Optional<ICollection<HttpStatusCode>> StatusCodes          { get; set; }
+      public Optional<bool>                        IsEnabled       { get; set; }
+      public Optional<int>                         MaxRetries      { get; set; }
+      public Optional<TimeSpan>                    RetryTimeout    { get; set; }
+      public Optional<BackOffPolicy>               BackOffPolicy   { get; set; }
+      public Optional<ICollection<HttpStatusCode>> StatusCodes     { get; set; }
+      public Optional<ExceptionPolicy>             ExceptionPolicy { get; set; }
     }
 
     public sealed record CircuitOptionsOverride
     {
-      public Optional<bool>                 IsEnabled { get; set; }
-      public Optional<CircuitBreakerPolicy> Policy    { get; set; }
+      public Optional<bool>          IsEnabled { get; set; }
+      public Optional<CircuitPolicy> Policy    { get; set; }
     }
 
     public sealed record CachingOptionsOverride

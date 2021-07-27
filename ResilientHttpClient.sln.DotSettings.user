@@ -1,0 +1,9 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=506bd859_002De168_002D42cb_002D97e5_002Df2f403ce7b64/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="ResilientHttpClientTests" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::095F8EF9-DEC9-4917-B969-19E4EE77823C::net5.0::ResilientHttp.ResilientHttpClientTests&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::095F8EF9-DEC9-4917-B969-19E4EE77823C::net5.0::ResilientHttp.Policies.BackOffPolicyTests.constant_policy_should_be_constant&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::095F8EF9-DEC9-4917-B969-19E4EE77823C::net5.0::ResilientHttp.Policies.BackOffPolicyTests.linear_policy_should_be_linear&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::095F8EF9-DEC9-4917-B969-19E4EE77823C::net5.0::ResilientHttp.Policies.BackOffPolicyTests&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

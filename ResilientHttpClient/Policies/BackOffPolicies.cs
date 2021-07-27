@@ -9,8 +9,7 @@ namespace ResilientHttp.Policies
 
   public static class BackOffPolicies
   {
-    private static readonly TimeSpan            MaxJitter = TimeSpan.FromSeconds(2);
-    private static readonly ThreadLocal<Random> Random    = new(() => new Random(Environment.TickCount));
+    private static readonly ThreadLocal<Random> Random = new(() => new Random(Environment.TickCount));
 
     public static BackOffPolicy Immediate()
     {
@@ -27,9 +26,9 @@ namespace ResilientHttp.Policies
       return attempt => Min(TimeSpan.FromMilliseconds(duration.TotalMilliseconds * attempt), maxDelay);
     }
 
-    public static BackOffPolicy LinearWithJitter(TimeSpan duration, TimeSpan maxDelay)
+    public static BackOffPolicy LinearWithJitter(TimeSpan duration, TimeSpan maxDelay, TimeSpan maxJitter)
     {
-      return attempt => Min(TimeSpan.FromMilliseconds(duration.TotalMilliseconds * attempt) + Jitter(), maxDelay);
+      return attempt => Min(TimeSpan.FromMilliseconds(duration.TotalMilliseconds * attempt) + Jitter(maxJitter), maxDelay);
     }
 
     public static BackOffPolicy Exponential(TimeSpan duration, TimeSpan baseDelay, TimeSpan maxDelay)
@@ -37,20 +36,24 @@ namespace ResilientHttp.Policies
       return attempt => Min(baseDelay + TimeSpan.FromMilliseconds(Math.Pow(2, attempt) * duration.TotalMilliseconds), maxDelay);
     }
 
-    public static BackOffPolicy ExponentialWithJitter(TimeSpan duration, TimeSpan baseDelay, TimeSpan maxDelay)
+    public static BackOffPolicy ExponentialWithJitter(TimeSpan duration, TimeSpan baseDelay, TimeSpan maxDelay, TimeSpan maxJitter)
     {
-      return attempt => Min(baseDelay + TimeSpan.FromMilliseconds(Math.Pow(2, attempt) * duration.TotalMilliseconds) + Jitter(), maxDelay);
+      return attempt => Min(baseDelay + TimeSpan.FromMilliseconds(Math.Pow(2, attempt) * duration.TotalMilliseconds) + Jitter(maxJitter), maxDelay);
     }
 
-    private static TimeSpan Jitter()
-    {
-      return TimeSpan.FromMilliseconds(Random.Value.Next(0, (int) MaxJitter.TotalMilliseconds));
-    }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static TimeSpan Jitter(TimeSpan maxJitter) => Random.Value.NextTimeSpan(maxJitter);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TimeSpan Max(TimeSpan a, TimeSpan b) => a > b ? a : b;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static TimeSpan NextTimeSpan(this Random random, TimeSpan maxValue)
+    {
+      return TimeSpan.FromMilliseconds(random.Next(0, (int) maxValue.TotalMilliseconds));
+    }
   }
 }

@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResilientHttpClient", "ResilientHttpClient\ResilientHttpClient.csproj", "{DD6B8AAB-F672-4F0C-B54C-11BC56D68C18}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResilientHttpClient.Tests", "ResilientHttpClient.Tests\ResilientHttpClient.Tests.csproj", "{095F8EF9-DEC9-4917-B969-19E4EE77823C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{DD6B8AAB-F672-4F0C-B54C-11BC56D68C18}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DD6B8AAB-F672-4F0C-B54C-11BC56D68C18}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DD6B8AAB-F672-4F0C-B54C-11BC56D68C18}.Release|Any CPU.Build.0 = Release|Any CPU
+		{095F8EF9-DEC9-4917-B969-19E4EE77823C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{095F8EF9-DEC9-4917-B969-19E4EE77823C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{095F8EF9-DEC9-4917-B969-19E4EE77823C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{095F8EF9-DEC9-4917-B969-19E4EE77823C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

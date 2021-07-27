@@ -5,7 +5,7 @@ using ResilientHttp.Policies;
 namespace ResilientHttp
 {
   /// <summary>
-  /// A <see cref="HttpRequestMessage"/> with an attached <see cref="ConnectionPolicyOverrides"/>
+  /// A <see cref="HttpRequestMessage"/> with an attached <see cref="ConnectionPolicy"/>
   /// for per-request behaviour that is unique from the default <see cref="ResilientHttpClient.ConnectionPolicy"/>.
   /// </summary>
   public class ResilientHttpRequestMessage : HttpRequestMessage
@@ -24,6 +24,6 @@ namespace ResilientHttp
     {
     }
 
-    public ConnectionPolicyOverrides ConnectionPolicyOverrides { get; } = new();
+    public ConnectionPolicyOverrides ConnectionPolicy { get; } = new();
   }
 }

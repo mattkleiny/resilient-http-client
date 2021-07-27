@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Common.Logging;
 using ResilientHttp.Policies;
+using ResilientHttp.Utilities;
 
 namespace ResilientHttp
 {
@@ -59,11 +60,24 @@ namespace ResilientHttp
 
       protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
       {
-        var context = connectionPolicy.ContextFactory(request);
-        var policy  = connectionPolicy.ToPollyPolicy(ResolveOverrides(request));
+        var overrides = ResolveOverrides(request);
+        var context   = connectionPolicy.ContextFactory(request);
+        var policy    = connectionPolicy.ToPollyPolicy(overrides);
+
+        var isRetryEnabled = overrides.Retry.IsEnabled.GetOrDefault(connectionPolicy.Retry.IsEnabled);
 
         var response = await policy.ExecuteAsync(
-          action: (_, innerToken) => base.SendAsync(request, innerToken),
+          action: (_, innerToken) =>
+          {
+            // N.B: we need to clone the outgoing request in case of retries, as the original request will be
+            // lost after the first submission; we only need to perform the clone if a retry policy is enabled, however.
+            if (isRetryEnabled)
+            {
+              return base.SendAsync(request.Clone(), innerToken);
+            }
+
+            return base.SendAsync(request, innerToken);
+          },
           context: context,
           cancellationToken: cancellationToken
         );
@@ -81,7 +95,7 @@ namespace ResilientHttp
       {
         if (request is ResilientHttpRequestMessage message)
         {
-          return message.ConnectionPolicyOverrides;
+          return message.ConnectionPolicy;
         }
 
         return ConnectionPolicyOverrides.None;

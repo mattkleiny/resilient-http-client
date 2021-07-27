@@ -17,9 +17,8 @@ namespace ResilientHttp.Utilities
       hasValue   = true;
     }
 
-    public bool IsSome => hasValue;
-    public bool IsNone => !hasValue;
-
+    public bool IsSome   => hasValue;
+    public bool IsNone   => !hasValue;
     public bool HasValue => hasValue;
 
     public T GetOrDefault(T defaultValue)
